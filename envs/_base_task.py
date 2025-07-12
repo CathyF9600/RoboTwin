@@ -470,16 +470,21 @@ class Base_Task(gym.Env):
             for camera_name in depth.keys():
                 pkl_dic["observation"][camera_name].update(depth[camera_name])
         # endpose
-        if self.data_type.get("endpose", False):
+        if self.data_type.get("endpose", True):
             norm_gripper_val = [
                 self.robot.get_left_gripper_val(),
                 self.robot.get_right_gripper_val(),
             ]
+            import pdb; pdb.set_trace()
+
             left_endpose = self.get_arm_pose("left")
             right_endpose = self.get_arm_pose("right")
-            pkl_dic["endpose"]["left_endpose"] = left_endpose
+            # left_qua = [left_endpose[4], left_endpose[5], left_endpose[6], left_endpose[3]]
+            # right_qua = [right_endpose[4], right_endpose[5], right_endpose[6], right_endpose[3]]
+
+            pkl_dic["endpose"]["left_endpose"] = left_endpose #left_endpose[:3].tolist() + left_qua
             pkl_dic["endpose"]["left_gripper"] = norm_gripper_val[0]
-            pkl_dic["endpose"]["right_endpose"] = right_endpose
+            pkl_dic["endpose"]["right_endpose"] = right_endpose #right_endpose[:3].tolist() + right_qua
             pkl_dic["endpose"]["right_gripper"] = norm_gripper_val[1]
         # qpos
         if self.data_type.get("qpos", False):
@@ -522,6 +527,7 @@ class Base_Task(gym.Env):
 
         pkl_dic = self.get_obs()
         save_pkl(self.folder_path["cache"] + f"{self.FRAME_IDX}.pkl", pkl_dic)  # use cache
+        print('***** endpose saaved to', self.folder_path["cache"] + f"{self.FRAME_IDX}.pkl")
         self.FRAME_IDX += 1
 
     def save_traj_data(self, idx):
@@ -531,7 +537,16 @@ class Base_Task(gym.Env):
             "right_joint_path": deepcopy(self.right_joint_path),
         }
         save_pkl(file_path, traj_data)
-
+    # def save_traj_data(self, idx):
+    #     file_path = os.path.join(self.save_dir, "_traj_data", f"episode{idx}.pkl")
+    #     traj_data = {
+    #         "left_joint_path": deepcopy(self.left_joint_path),
+    #         "right_joint_path": deepcopy(self.right_joint_path),
+    #         "left_endpose_path": deepcopy(self.left_endpose_path),    # You need to record this during rollout
+    #         "right_endpose_path": deepcopy(self.right_endpose_path),  # You need to record this during rollout
+    #     }
+    #     save_pkl(file_path, traj_data)
+    
     def load_tran_data(self, idx):
         assert self.save_dir is not None, "self.save_dir is None"
         file_path = os.path.join(self.save_dir, "_traj_data", f"episode{idx}.pkl")
@@ -1225,7 +1240,7 @@ class Base_Task(gym.Env):
             z_transform = True
 
         end_effector_pose = (self.robot.get_left_ee_pose() if arm_tag == "left" else self.robot.get_right_ee_pose())
-
+        print('end_effector_pose', end_effector_pose)
         if constrain == "auto":
             grasp_direct_vec = place_start_pose.p - end_effector_pose[:3]
             if np.abs(np.dot(grasp_direct_vec, [0, 0, 1])) <= 0.1:

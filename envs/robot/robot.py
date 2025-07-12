@@ -605,6 +605,29 @@ class Robot:
         endpose_arr[:3, 3] = ee_pose.p + endpose_arr[:3, :3] @ np.array([dis, 0, 0]).T
         res = (endpose_arr[:3, 3].tolist() + t3d.quaternions.mat2quat(endpose_arr[:3, :3]).tolist())
         return res
+    
+    # def _trans_endpose(self, arm_tag=None, is_endpose=False):
+    #     if arm_tag is None:
+    #         print("No arm tag")
+    #         return
+    #     gripper_bias = (self.left_gripper_bias if arm_tag == "left" else self.right_gripper_bias)
+    #     global_trans_matrix = (self.left_global_trans_matrix if arm_tag == "left" else self.right_global_trans_matrix)
+    #     delta_matrix = (self.left_delta_matrix if arm_tag == "left" else self.right_delta_matrix)
+    #     ee_pose = (self.left_ee.global_pose if arm_tag == "left" else self.right_ee.global_pose)
+    #     endpose_arr = np.eye(4)
+    #     endpose_arr[:3, :3] = (t3d.quaternions.quat2mat(ee_pose.q) @ global_trans_matrix @ delta_matrix)
+    #     dis = gripper_bias
+    #     if is_endpose == False:
+    #         dis -= 0.12
+    #     endpose_arr[:3, 3] = ee_pose.p + endpose_arr[:3, :3] @ np.array([dis, 0, 0]).T
+
+    #     quat_wxyz = t3d.quaternions.mat2quat(endpose_arr[:3, :3])
+    #     # Convert from [w, x, y, z] to [x, y, z, w]
+    #     quat_xyzw = [quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]]
+    #     print('quat_wxyz', quat_wxyz)
+    #     print("quat_xyzw", quat_xyzw)
+    #     res = endpose_arr[:3, 3].tolist() + quat_xyzw
+    #     return res
 
     def _entity_qf(self, entity):
         qf = entity.compute_passive_force(gravity=True, coriolis_and_centrifugal=True)

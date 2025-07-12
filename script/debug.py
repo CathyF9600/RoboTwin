@@ -204,11 +204,10 @@ def run(TASK_ENV, args):
             print(f"\033[34mTask name: {args['task_name']}\033[0m")
 
             TASK_ENV.setup_demo(now_ep_num=episode_idx, seed=seed_list[episode_idx], **args)
-            # import pdb; pdb.set_trace()
 
             traj_data = TASK_ENV.load_tran_data(episode_idx)
-            # print('traj_data', traj_data['endpose'])
-            # input()
+            print('traj_data', traj_data)
+            input()
             args["left_joint_path"] = traj_data["left_joint_path"]
             args["right_joint_path"] = traj_data["right_joint_path"]
             TASK_ENV.set_path_lst(args)
@@ -236,28 +235,223 @@ def run(TASK_ENV, args):
         command = f"cd description && bash gen_episode_instructions.sh {args['task_name']} {args['task_config']} {args['language_num']}"
         os.system(command)
 
+def print_hdf5_structure(g, prefix=""):
+    for key in g:
+        item = g[key]
+        path = f"{prefix}/{key}"
+        if isinstance(item, h5py.Group):
+            print(f"{path} [Group]")
+            print_hdf5_structure(item, path)
+        else:
+            print(f"{path} [Dataset] shape: {item.shape}")
 
+import h5py
+def get_key(hdf5_path):    
+    
+    with h5py.File(hdf5_path, "r") as f:
+        print("Listing all keys:")
+        print_hdf5_structure(f)
         
+def save_camera_images_and_actions(hdf5_path, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+
+    with h5py.File(hdf5_path, "r") as f:
+        print("Listing all keys:")
+        print_hdf5_structure(f)
+        
+        # Detect cameras with RGB data
+        cameras = []
+        for cam in f["observation"]:
+            if "rgb" in f[f"observation/{cam}"]:
+                cameras.append(cam)
+
+        if not cameras:
+            print("No RGB camera data found in HDF5.")
+            return
+
+        print("Saving images from cameras:", cameras)
+
+        num_frames = f[f"observation/{cameras[0]}/rgb"].shape[0]
+        left_ee = f["endpose/left_endpose"][()]       # shape (T, 7)
+        right_ee = f["endpose/right_endpose"][()]     # shape (T, 7)
+        left_grip = f["endpose/left_gripper"][()]  # shape (T,)
+        right_grip = f["endpose/right_gripper"][()]  # shape (T,)
+        # Save images and print actions
+        for frame_idx in range(2):
+            # for cam in cameras:
+            #     rgb_encoded = f[f"observation/{cam}/rgb"][frame_idx]
+            #     img = cv2.imdecode(np.frombuffer(rgb_encoded, np.uint8), cv2.IMREAD_COLOR)
+            #     img_path = os.path.join(output_dir, cam, f"frame_{frame_idx:04d}.jpg")
+            #     cv2.imwrite(img_path, img)
+
+            # EE pose
+            lpos = left_ee[frame_idx]
+            rpos = right_ee[frame_idx]
+            lg = left_grip[frame_idx]
+            rg = right_grip[frame_idx]
+
+            print(f"Frame {frame_idx:04d}", lpos)
+            print(f"  Left EE:  pos=({lpos[0]:.3f}, {lpos[1]:.3f}, {lpos[2]:.3f})  quat=({lpos[3]:.3f}, {lpos[4]:.3f}, {lpos[5]:.3f}, {lpos[6]:.3f})  gripper={lg:.2f}")
+            # print(f"  Right EE: pos=({rpos[0]:.3f}, {rpos[1]:.3f}, {rpos[2]:.3f})  quat=({rpos[3]:.3f}, {rpos[4]:.3f}, {rpos[5]:.3f}, {rpos[6]:.3f})  gripper={rg:.2f}")
+
+        print(f"\nSaved {num_frames} frames per camera to '{output_dir}'")
+
+def read_values(hdf5_path):
+    with h5py.File(hdf5_path, "r") as f:
+        print("Listing all keys:")
+        print_hdf5_structure(f)
+        
+        if "task_name" not in f:
+            raise KeyError("No 'task_name' found in the HDF5 file.")
+        task_name = f["task_name"][()].decode("utf-8")
+        print("Task Name:", task_name)
+        # Detect cameras with RGB data
+        cameras = []
+        for cam in f["observation"]:
+            if "rgb" in f[f"observation/{cam}"]:
+                cameras.append(cam)
+
+        if not cameras:
+            print("No RGB camera data found in HDF5.")
+            return
+
+        print("Saving images from cameras:", cameras)
+
+        num_frames = f[f"observation/{cameras[0]}/rgb"].shape[0]
+        left_ee = f["endpose/left_endpose"][()]       # shape (T, 7)
+        right_ee = f["endpose/right_endpose"][()]     # shape (T, 7)
+        left_grip = f["endpose/left_gripper"][()]  # shape (T,)
+        right_grip = f["endpose/right_gripper"][()]  # shape (T,)
+        try:
+            left_new_key = f["endpose/left_endpose_xyzw"][()]
+            right_new_key = f["endpose/right_endpose_xyzw"][()]
+        except:
+            left_new_key = None
+            right_new_key = None
+            print("No combined endpose found in HDF5.")
+        # Save images and print actions
+        for frame_idx in range(num_frames):
+            # for cam in cameras:
+            #     rgb_encoded = f[f"observation/{cam}/rgb"][frame_idx]
+            #     img = cv2.imdecode(np.frombuffer(rgb_encoded, np.uint8), cv2.IMREAD_COLOR)
+            #     img_path = os.path.join(output_dir, cam, f"frame_{frame_idx:04d}.jpg")
+            #     cv2.imwrite(img_path, img)
+
+            # EE pose
+            lpos = left_ee[frame_idx]
+            rpos = right_ee[frame_idx]
+            lg = left_grip[frame_idx]
+            rg = right_grip[frame_idx]
+            lposn = left_new_key[frame_idx] if left_new_key is not None else lpos
+            rposn = right_new_key[frame_idx] if right_new_key is not None else rpos
+            
+
+            print(f"Frame {frame_idx:04d}", lpos)
+            print(f"  Left EE:  pos=({lpos[0]:.3f}, {lpos[1]:.3f}, {lpos[2]:.3f})  quat=({lpos[3]:.3f}, {lpos[4]:.3f}, {lpos[5]:.3f}, {lpos[6]:.3f})  gripper={lg:.2f}")
+            print(f"  Right EE: pos=({rpos[0]:.3f}, {rpos[1]:.3f}, {rpos[2]:.3f})  quat=({rpos[3]:.3f}, {rpos[4]:.3f}, {rpos[5]:.3f}, {rpos[6]:.3f})  gripper={rg:.2f}")
+            try: 
+                print(f"  Left EE:  pos=({lposn[0]:.3f}, {lposn[1]:.3f}, {lposn[2]:.3f})  quat=({lposn[3]:.3f}, {lposn[4]:.3f}, {lposn[5]:.3f}, {lposn[6]:.3f})  gripper={lg:.2f}")
+                print(f"  Right EE: pos=({rposn[0]:.3f}, {rposn[1]:.3f}, {rposn[2]:.3f})  quat=({rposn[3]:.3f}, {rposn[4]:.3f}, {rposn[5]:.3f}, {rposn[6]:.3f})  gripper={rg:.2f}")
+            except:
+                print("No combined endpose found in HDF5.")
+        # print(f"\nSaved {num_frames} frames per camera to '{output_dir}'")
+        
+def add_separate_swapped_endposes(hdf5_path):
+    with h5py.File(hdf5_path, "a") as f:
+        left_key = "endpose/left_endpose"
+        right_key = "endpose/right_endpose"
+        left_new_key = "endpose/left_endpose_xyzw"
+        right_new_key = "endpose/right_endpose_xyzw"
+
+        if left_key not in f or right_key not in f:
+            raise KeyError("Missing left or right endpose in HDF5.")
+
+        left = f[left_key][()]    # shape (T, 7)
+        right = f[right_key][()]  # shape (T, 7)
+
+        def swap_quat(data):
+            pos = data[:, :3]
+            quat = data[:, 3:]         # wxyz
+            quat_swapped = quat[:, [1, 2, 3, 0]]  # xyzw
+            return np.concatenate([pos, quat_swapped], axis=1)
+
+        left_swapped = swap_quat(left)
+        right_swapped = swap_quat(right)
+
+        for key, arr in [(left_new_key, left_swapped), (right_new_key, right_swapped)]:
+            if key in f:
+                print(f"Overwriting existing dataset: {key}")
+                del f[key]
+            f.create_dataset(key, data=arr)
+        
+def add_lang(hdf5_path):
+    with h5py.File(hdf5_path, "a") as f:  # Use append mode so we can add data
+        print("Listing all keys:")
+        print_hdf5_structure(f)
+
+        # === Parse task name from path ===
+        task_name = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(hdf5_path)))).replace("_", " ")   # demo_randomized -> open_microwave
+        
+        print(f"Parsed task name: {task_name}")
+
+        if "task_name" in f:
+            print("Overwriting existing task_name")
+            del f["task_name"]
+        f.create_dataset("task_name", data=task_name.encode("utf-8"))
+
+        # === Load and add instructions ===
+        json_path = os.path.join(
+            os.path.dirname(os.path.dirname(hdf5_path)),  # demo_randomized/
+            "instructions",
+            os.path.basename(hdf5_path).replace(".hdf5", ".json")
+        )
+
+        if not os.path.exists(json_path):
+            raise FileNotFoundError(f"Instruction file not found: {json_path}")
+
+        with open(json_path, "r") as jf:
+            instr_data = json.load(jf)
+
+        if "instructions" in f:
+            print("Overwriting existing instructions")
+            del f["instructions"]
+        instr_group = f.create_group("instructions")
+
+        for split in ["seen", "unseen"]:
+            lines = instr_data.get(split, [])
+            print("lines", lines)
+            encoded_lines = [s.encode("utf-8") for s in lines]
+            max_len = max(len(x) for x in encoded_lines) if encoded_lines else 1
+            instr_group.create_dataset(
+                split, data=encoded_lines, dtype=f"S{max_len}"
+            )
+
+        print("✅ Successfully added task_name and instructions to HDF5.")
+
 if __name__ == "__main__":
-    from test_render import Sapien_TEST
-    Sapien_TEST()
+    # from test_render import Sapien_TEST
+    # Sapien_TEST()
 
-    import torch.multiprocessing as mp
-    mp.set_start_method("spawn", force=True)
+    # import torch.multiprocessing as mp
+    # mp.set_start_method("spawn", force=True)
 
-    parser = ArgumentParser()
-    parser.add_argument("task_name", type=str)
-    parser.add_argument("task_config", type=str)
-    parser = parser.parse_args()
-    task_name = parser.task_name
-    task_config = parser.task_config
+    # parser = ArgumentParser()
+    # parser.add_argument("task_name", type=str)
+    # parser.add_argument("task_config", type=str)
+    # parser = parser.parse_args()
+    # task_name = parser.task_name
+    # task_config = parser.task_config
 
-    main(task_name=task_name, task_config=task_config)
+    # main(task_name=task_name, task_config=task_config)
     
     
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--hdf5_path", type=str, required=True, help="Path to the HDF5 file")
-    # parser.add_argument("--output_dir", type=str, required=True, help="Directory to save output images")
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hdf5_path", type=str, required=True, help="Path to the HDF5 file")
+    parser.add_argument("--output_dir", type=str, required=False, help="Directory to save output images")
+    args = parser.parse_args()
 
-    # save_camera_images_and_actions(args.hdf5_path, args.output_dir)
+    # read_values(args.hdf5_path)
+    # input('add now')
+    add_lang(args.hdf5_path)
+    add_separate_swapped_endposes(args.hdf5_path)
+    read_values(args.hdf5_path)
