@@ -475,7 +475,7 @@ class Base_Task(gym.Env):
                 self.robot.get_left_gripper_val(),
                 self.robot.get_right_gripper_val(),
             ]
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
 
             left_endpose = self.get_arm_pose("left")
             right_endpose = self.get_arm_pose("right")
