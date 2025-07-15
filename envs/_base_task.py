@@ -527,7 +527,7 @@ class Base_Task(gym.Env):
 
         pkl_dic = self.get_obs()
         save_pkl(self.folder_path["cache"] + f"{self.FRAME_IDX}.pkl", pkl_dic)  # use cache
-        print('***** endpose saaved to', self.folder_path["cache"] + f"{self.FRAME_IDX}.pkl")
+        # print('***** endpose saaved to', self.folder_path["cache"] + f"{self.FRAME_IDX}.pkl")
         self.FRAME_IDX += 1
 
     def save_traj_data(self, idx):
@@ -1240,7 +1240,7 @@ class Base_Task(gym.Env):
             z_transform = True
 
         end_effector_pose = (self.robot.get_left_ee_pose() if arm_tag == "left" else self.robot.get_right_ee_pose())
-        print('end_effector_pose', end_effector_pose)
+        #  print('end_effector_pose', end_effector_pose)
         if constrain == "auto":
             grasp_direct_vec = place_start_pose.p - end_effector_pose[:3]
             if np.abs(np.dot(grasp_direct_vec, [0, 0, 1])) <= 0.1:
